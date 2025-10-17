@@ -229,7 +229,8 @@ specialty_map = {
     "GENERAL": "Gen",
     "GEN": "Gen",
     "CAS": "Cassis",
-    "CASSIS": "Cassis"
+    "CASSIS": "Cassis",
+    "CASIS": "Cassis"
 }
 
 def parse_query(query):
@@ -241,14 +242,14 @@ def parse_query(query):
     if specialty:
         if "fellow" in query_lower:
             call_type = "fellow"
-        elif any(x in query_lower for x in ["cons", "consultant", "cas", "casis"]):
+        elif any(x in query_lower for x in ["cons", "consultant", "cas", 'cassis',"casis"]):
             call_type = "consultant"
         else:
             # Default to fellow if specialty is given but type not specified
             call_type = "fellow"
     else:
         # If no specialty but query mentions consultant keywords
-        if any(x in query_lower for x in ["cons", "consultant"]):
+        if "cons" in query_lower or "consultant" in query_lower:
             call_type = "consultant"
             specialty = "Gen"
         else:
