@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import pytz
 from dateparser.search import search_dates
+from flask import Flask
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import threading
 import time
@@ -291,28 +292,22 @@ def handle_query(update, context):
 
 
 # -----------------------------
-# Main loop
+# Telegram bot setup
 # -----------------------------
+TOKEN = os.getenv("BOT_TOKEN")
+updater = Updater(TOKEN, use_context=True)
+dp = updater.dispatcher
 
-if __name__ == "__main__":
-    TOKEN = os.getenv("BOT_TOKEN")
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+dp.add_handler(CommandHandler("start", start))
+dp.add_handler(MessageHandler(Filters.text & (~Filters.command), handle_query))
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & (~Filters.command), handle_query))
-
-    updater.start_polling()
-    print("Bot started ✅")
-    updater.idle()
+# Run polling in a background thread
+threading.Thread(target=updater.start_polling, daemon=True).start()
+print("Bot polling started ✅")
 
 # -----------------------------
 # Tiny web server to satisfy Render
 # -----------------------------
-import os
-from flask import Flask
-
-# Simple web server to satisfy Render
 app = Flask("bot")
 
 @app.route("/")
