@@ -241,12 +241,18 @@ def parse_query(query):
     if specialty:
         if "fellow" in query_lower:
             call_type = "fellow"
-        elif "cons" in query_lower or "consultant" in query_lower:
+        elif any(x in query_lower for x in ["cons", "consultant", "cas", "casis"]):
             call_type = "consultant"
         else:
+            # Default to fellow if specialty is given but type not specified
             call_type = "fellow"
     else:
-        call_type = "MO"
+        # If no specialty but query mentions consultant keywords
+        if any(x in query_lower for x in ["cons", "consultant"]):
+            call_type = "consultant"
+            specialty = "Gen"
+        else:
+            call_type = "MO"
 
     results = search_dates(query_lower, languages=['en'],
         settings={'PREFER_DATES_FROM': 'future', 'RELATIVE_BASE': datetime.now(sgt)})
