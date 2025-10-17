@@ -4,31 +4,52 @@ from datetime import datetime
 import pytz
 from dateparser.search import search_dates
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+import threading
+import time
 import nest_asyncio
+
+nest_asyncio.apply()
 
 # =====================
 # Google Sheet setup
 # =====================
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1mZx6j7hEuJYeuYM0i79XUQ1gRJTg1I8cTnIgIGBHDyI/edit?gid=43119476#gid=43119476"
-SHEET_ID = SHEET_URL.split("/d/")[1].split("/")[0]
-TABS = ["MO_Reg", "Fellows", "Consultants"]
 
-def load_sheet():
+sheet_url = "https://docs.google.com/spreadsheets/d/1mZx6j7hEuJYeuYM0i79XUQ1gRJTg1I8cTnIgIGBHDyI/edit?gid=43119476#gid=43119476"
+sheet_id = sheet_url.split("/d/")[1].split("/")[0]
+tabs = ["MO_Reg", "Fellows", "Consultants"]
+
+df = None
+
+def fetch_sheet():
+    global df
     dfs = []
-    for tab in TABS:
-        csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={tab}"
-        df = pd.read_csv(csv_url)
-        df.columns = df.columns.str.strip()
-        dfs.append(df)
+    for tab in tabs:
+        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={tab}"
+        df_tab = pd.read_csv(csv_url)
+        df_tab.columns = df_tab.columns.str.strip()
+        dfs.append(df_tab)
 
     base = dfs[0][["Date", "Day"]].copy()
-    for df in dfs:
-        extra_cols = [c for c in df.columns if c not in ["Date", "Day"]]
-        base = pd.concat([base, df[extra_cols]], axis=1)
-    base["Date"] = pd.to_datetime(base["Date"])
-    return base
+    for df_extra in dfs:
+        extra_cols = [c for c in df_extra.columns if c not in ["Date", "Day"]]
+        base = pd.concat([base, df_extra[extra_cols]], axis=1)
 
-df = load_sheet()
+    df = base
+    df["Date"] = pd.to_datetime(df["Date"])
+    print(f"Google Sheet refreshed at {datetime.now()}")
+
+# Initial fetch
+fetch_sheet()
+
+# -----------------------------
+# Background thread: refresh every 24 hours
+# -----------------------------
+def daily_refresh(interval_hours=24):
+    while True:
+        time.sleep(interval_hours * 3600)
+        fetch_sheet()
+
+threading.Thread(target=daily_refresh, daemon=True).start()
 
 # =====================
 # Google Collab Functions
@@ -249,8 +270,6 @@ def overall_function(query):
 # -----------------------------
 # Telegram Bot
 # -----------------------------
-
-nest_asyncio.apply()
 
 def start(update, context):
     update.message.reply_text(
