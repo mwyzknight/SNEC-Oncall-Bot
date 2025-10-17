@@ -305,3 +305,20 @@ if __name__ == "__main__":
     updater.start_polling()
     print("Bot started ✅")
     updater.idle()
+
+# -----------------------------
+# Tiny web server to satisfy Render
+# -----------------------------
+import os
+from flask import Flask
+
+# Simple web server to satisfy Render
+app = Flask("bot")
+
+@app.route("/")
+def home():
+    return "Bot is running ✅"
+
+# Render provides PORT as an environment variable
+port = int(os.environ.get("PORT", 10000))
+app.run(host="0.0.0.0", port=port)
