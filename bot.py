@@ -43,14 +43,14 @@ def fetch_sheet():
 fetch_sheet()
 
 # -----------------------------
-# Background thread: refresh every 24 hours
+# Background thread: refresh every 30mins
 # -----------------------------
-def daily_refresh(interval_hours=24):
+def periodic_refresh(interval_minutes=15):
     while True:
-        time.sleep(interval_hours * 3600)
+        time.sleep(interval_minutes * 60)
         fetch_sheet()
 
-threading.Thread(target=daily_refresh, daemon=True).start()
+threading.Thread(target=periodic_refresh, daemon=True).start()
 
 # =====================
 # Google Collab Functions
