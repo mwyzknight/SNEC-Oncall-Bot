@@ -76,7 +76,7 @@ def fetch_contacts_sheet():
             "HANDPHONE": "HANDPHONE",
             "CO. HANDPHONE": "CO_HANDPHONE"
         })
-        df_tab = df_tab_tab[df_tab["NAME"].notna() & df_tab["NAME"].str.strip() != ""]
+        df_tab = df_tab[df_tab["NAME"].notna() & df_tab["NAME"].str.strip() != ""]
 
         for col in ["HANDPHONE", "CO_HANDPHONE"]:
             if col not in df_tab.columns:
