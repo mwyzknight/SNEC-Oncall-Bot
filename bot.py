@@ -378,7 +378,8 @@ def handle_query(update, context):
     try:
         response_names = overall_function(query)  # original on-call names
         phone_numbers = get_phone_number(response_names, contacts_df)
-        final_reply = f"{response_names}\n\n{phone_numbers}"    except Exception as e:
+        final_reply = f"{response_names}\n\n{phone_numbers}"
+    except Exception as e:
         response = f"⚠️ Something went wrong:\n{e}"
     update.message.reply_text(response)
 
