@@ -5,3 +5,4 @@ dateparser
 pytz
 nest_asyncio
 Flask
+rapidfuzz
