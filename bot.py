@@ -1,9 +1,11 @@
 import os
+import re
 import pandas as pd
 from datetime import datetime
 import pytz
 from dateparser.search import search_dates
 from flask import Flask
+from rapidfuzz import process, fuzz
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import threading
 import time
@@ -12,7 +14,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 # =====================
-# Google Sheet setup
+# On Call Google Sheet 
 # =====================
 
 sheet_url = "https://docs.google.com/spreadsheets/d/1mZx6j7hEuJYeuYM0i79XUQ1gRJTg1I8cTnIgIGBHDyI/edit?gid=43119476#gid=43119476"
@@ -42,15 +44,69 @@ def fetch_sheet():
 # Initial fetch
 fetch_sheet()
 
-# -----------------------------
 # Background thread: refresh every 30mins
-# -----------------------------
 def periodic_refresh(interval_minutes=15):
     while True:
         time.sleep(interval_minutes * 60)
         fetch_sheet()
 
 threading.Thread(target=periodic_refresh, daemon=True).start()
+
+# =====================
+# Phone Number Google Sheet 
+# =====================
+
+CONTACTS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1gKHurth2CRKufDoLI0WI_04XzZq2jZsw8tsmvV8kYUk/edit#gid=601029071"
+CONTACTS_SHEET_ID = CONTACTS_SHEET_URL.split("/d/")[1].split("/")[0]
+CONTACT_TABS = ["RPs_Residents_MOs", "AC_Reg", "SC_C", "Others"]
+
+contacts_df = None
+
+def fetch_contacts_sheet():
+    global contacts_df
+    all_dfs = []
+
+    for tab in CONTACT_TABS:
+        csv_url = f"https://docs.google.com/spreadsheets/d/{CONTACTS_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={tab}"
+        df_tab = pd.read_csv(csv_url, keep_default_na=False)
+        df_tab.columns = [c.strip() for c in df_tab.columns]
+
+        df_tab = df_tab.rename(columns={
+            "NAME": "NAME",
+            "HANDPHONE": "HANDPHONE",
+            "CO. HANDPHONE": "CO_HANDPHONE"
+        })
+        df_tab = df_tab_tab[df_tab["NAME"].notna() & df_tab["NAME"].str.strip() != ""]
+
+        for col in ["HANDPHONE", "CO_HANDPHONE"]:
+            if col not in df_tab.columns:
+                df_tab[col] = ""
+
+        def pick_phone(row):
+            hand = row.get("HANDPHONE", "")
+            co = row.get("CO_HANDPHONE", "")
+            if hand and hand != "--":
+                return str(hand)
+            elif co and co != "--":
+                return str(co)
+            else:
+                return "Not available"
+
+        df_tab["PHONE_FINAL"] = df_tab.apply(pick_phone, axis=1)
+        all_dfs.append(df_tab[["NAME", "PHONE_FINAL"]])
+
+    contacts_df = pd.concat(all_dfs, ignore_index=True).drop_duplicates(subset=["NAME"], keep="first")
+    contacts_df['NAME'] = contacts_df['NAME'].apply(lambda x: re.sub(r"\(.*?\)", "", x).strip())
+    print("Contacts sheet refreshed ✅")
+
+# Initial fetch + background refresh every 14 days
+fetch_contacts_sheet()
+def fortnight_refresh(interval_days=14):
+    while True:
+        time.sleep(interval_days * 86400)
+        fetch_contacts_sheet()
+
+threading.Thread(target=fortnight_refresh, daemon=True).start()
 
 # =====================
 # Google Collab Functions
@@ -275,6 +331,34 @@ def overall_function(query):
     else:
         return overall_MO_on_call_function(args["date"], args["location"])
 
+# =====================
+# Phone Number Function
+# =====================
+def get_phone_number(text, contacts_df, score_cutoff=25):
+    results = {}
+    lines = re.split(r'[:\n]', text)
+    for line in lines:
+        line = line.strip()
+        if not line or len(line) < 2:
+            continue
+        if any(label.lower() in line.lower() for label in ["mo", "registrar", "consultant", "fellow", "team"]):
+            continue
+
+        query_tokens = set(line.lower().split())
+        candidates = contacts_df['NAME'][contacts_df['NAME'].str.lower().apply(lambda x: query_tokens <= set(x.split()))]
+
+        if len(candidates) == 0:
+            candidates = contacts_df['NAME']
+
+        match, score, idx = process.extractOne(query=line, choices=candidates, scorer=fuzz.token_set_ratio)
+        if score >= score_cutoff:
+            results[contacts_df.loc[idx, "NAME"]] = contacts_df.loc[idx, "PHONE_FINAL"]
+        else:
+            results[line] = "No match found in database"
+
+    results = str(results).strip("{}").replace("'", "").replace(", ", "\n")
+    return "Suggested phone number(s):\n" + results
+
 # -----------------------------
 # Telegram Bot
 # -----------------------------
@@ -292,11 +376,11 @@ def start(update, context):
 def handle_query(update, context):
     query = update.message.text
     try:
-        response = overall_function(query)
-    except Exception as e:
+        response_names = overall_function(query)  # original on-call names
+        phone_numbers = get_phone_number(response_names, contacts_df)
+        final_reply = f"{response_names}\n\n{phone_numbers}"    except Exception as e:
         response = f"⚠️ Something went wrong:\n{e}"
     update.message.reply_text(response)
-
 
 # -----------------------------
 # Telegram bot setup
