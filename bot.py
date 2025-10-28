@@ -380,8 +380,8 @@ def handle_query(update, context):
         phone_numbers = get_phone_number(response_names, contacts_df)
         final_reply = f"{response_names}\n\n{phone_numbers}"
     except Exception as e:
-        response = f"⚠️ Something went wrong:\n{e}"
-    update.message.reply_text(response)
+        final_reply = f"⚠️ Something went wrong:\n{e}"
+    update.message.reply_text(final_reply)
 
 # -----------------------------
 # Telegram bot setup
