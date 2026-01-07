@@ -375,8 +375,10 @@ def start(update, context):
 
 def handle_query(update, context):
     query = update.message.text
+    print(f"Telegram query received: {query}")  # <-- debug
     try:
-        response_names = overall_function(query)  # original on-call names
+        response_names = overall_function(query)
+        print(f"Overall function output: {response_names}")  # debug
         phone_numbers = get_phone_number(response_names, contacts_df)
         final_reply = f"{response_names}\n\n{phone_numbers}"
     except Exception as e:
